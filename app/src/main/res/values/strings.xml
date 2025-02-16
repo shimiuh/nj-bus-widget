@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Floating widget</string>
+    <string name="app_name">NJ-T Floating widget</string>
     <string name="tile_name">NJ-T</string>
     <string name="passenger">%1$d Adult</string>
 </resources>

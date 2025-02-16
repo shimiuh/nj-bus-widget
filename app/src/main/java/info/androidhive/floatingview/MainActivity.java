@@ -41,7 +41,6 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.notify_me).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // Open quick settings tile settings
                 Intent intent = new Intent("android.settings.QUICK_SETTINGS_TILE_SERVICE_SETTINGS");
                 startActivity(intent);
                 Toast.makeText(MainActivity.this, 
