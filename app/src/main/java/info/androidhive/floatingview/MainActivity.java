@@ -21,21 +21,17 @@ public class MainActivity extends AppCompatActivity {
         Hawk.init(this).build();
         setContentView(R.layout.activity_main);
 
-        //Check if the application has draw over other apps permission or not?
-        //This permission is by default available for API<23. But for API > 23
-        //you have to ask for the permission in runtime.
+        // Check for overlay permission
         if (!Settings.canDrawOverlays(this)) {
-
-            //If the draw over permission is not available open the settings screen
-            //to grant the permission.
-            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
+            // Request permission
+            Intent intent = new Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + getPackageName())
+            );
             startActivityForResult(intent, CODE_DRAW_OVER_OTHER_APP_PERMISSION);
-
         }
 
         initializeView();
-        //startService();
     }
 
     /**
@@ -45,38 +41,24 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.notify_me).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                startService();
+                // Open quick settings tile settings
+                Intent intent = new Intent("android.settings.ACTION_QUICK_SETTINGS");
+                startActivity(intent);
+                Toast.makeText(MainActivity.this, 
+                    "Add the NJ-T tile from Quick Settings", 
+                    Toast.LENGTH_LONG).show();
+                finish();
             }
         });
     }
 
-    private void startService() {
-        Intent serviceIntent = new Intent(this, FloatingViewService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
-        } else {
-            startService(serviceIntent);
-        }
-        finish();
-    }
-
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == CODE_DRAW_OVER_OTHER_APP_PERMISSION) {
-
-            //Check if the permission is granted or not.
-            if (resultCode == RESULT_OK) {
-                initializeView();
-            } else { //Permission is not available
-                Toast.makeText(this,
-                        "Draw over other app permission not available. Closing the application",
-                        Toast.LENGTH_SHORT).show();
-
-                finish();
+            if (!Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show();
             }
-        } else {
-            super.onActivityResult(requestCode, resultCode, data);
         }
     }
 }

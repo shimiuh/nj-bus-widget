@@ -27,6 +27,7 @@ public class FloatingViewService extends Service {
 
     private static final int FOREGROUND_SERVICE_ID = 1;
     private static final String CHANNEL_ID = "ForegroundServiceChannel";
+    private static final int NOTIFICATION_ID = 1;
 
     private WindowManager mWindowManager;
     private View mFloatingView;
@@ -48,19 +49,22 @@ public class FloatingViewService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Floating View Service")
-                .setContentText("Running...")
-                // Ensure you have a valid icon here
-                //.setSmallIcon(R.drawable.ic_launcher_foreground)
-                .build();
-
-        startForeground(FOREGROUND_SERVICE_ID, notification);
+        startForeground(NOTIFICATION_ID, createNotification());
+        
+        // Initialize Hawk
         Hawk.init(this).build();
-        //Every time you run this app you will need to remove and add the tile
-        //Inflate the floating view layout we created
+        
+        // Inflate the floating view
         mFloatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_widget, null);
-        //here is all the science of params
+        
+        // Initialize views and setup touch listeners
+        initializeViews();
+        
+        // Setup and add window
+        setupWindowParams();
+    }
+
+    private void initializeViews() {
         mScaleDetector = new ScaleGestureDetector(mFloatingView.getContext(), new ScaleListener());
 
         mTopView = mFloatingView.findViewById(R.id.mTopView);
@@ -74,14 +78,14 @@ public class FloatingViewService extends Service {
         mMidView.setOnTouchListener(mViewTouchListener);
         mBottomView.setOnTouchListener(mViewTouchListener);
 
-
+        // Restore saved scales and positions
         setScale(mTopView, Hawk.get("scale"+mTopView.getId(), 1.0f));
         setScale(mMidView, Hawk.get("scale"+mMidView.getId(), 1.0f));
         setScale(mBottomView, Hawk.get("scale"+mBottomView.getId(), 1.0f));
 
-        setTranslation(mTopView, Hawk.get("transX"+mTopView.getId(), 0f),Hawk.get("transY"+mTopView.getId(), 0f));
-        setTranslation(mMidView, Hawk.get("transX"+mMidView.getId(), 0f),Hawk.get("transY"+mMidView.getId(), 0f));
-        setTranslation(mBottomView, Hawk.get("transX"+mBottomView.getId(), 0f),Hawk.get("transY"+mBottomView.getId(), 0f));
+        setTranslation(mTopView, Hawk.get("transX"+mTopView.getId(), 0f), Hawk.get("transY"+mTopView.getId(), 0f));
+        setTranslation(mMidView, Hawk.get("transX"+mMidView.getId(), 0f), Hawk.get("transY"+mMidView.getId(), 0f));
+        setTranslation(mBottomView, Hawk.get("transX"+mBottomView.getId(), 0f), Hawk.get("transY"+mBottomView.getId(), 0f));
 
         mFloatingView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -91,32 +95,9 @@ public class FloatingViewService extends Service {
                     mClickCount = 0;
                 }
                 mPassenger.setText(getString(R.string.passenger,mClickCount));
-
             }
         });
-
-        int LAYOUT_FLAG;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        } else {
-            LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_PHONE;
-        }
-
-        final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                LAYOUT_FLAG,
-                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN ,
-                PixelFormat.TRANSLUCENT);
-
-        params.gravity = Gravity.TOP;        //Initially view will be added to top-left corner
-
-        //Add the view to the window
-        mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        mWindowManager.addView(mFloatingView, params);
-
     }
-
 
     public View.OnTouchListener mViewTouchListener = new View.OnTouchListener() {
         private float initialX;
@@ -219,13 +200,51 @@ public class FloatingViewService extends Service {
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            CharSequence name = "NJ Bus";// getString(R.string.channel_name);
-            String description = "NJ Bus";//getString(R.string.channel_description);
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
-            channel.setDescription(description);
-            NotificationManager notificationManager = getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "Floating View Service",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            manager.createNotificationChannel(channel);
         }
+    }
+
+    private Notification createNotification() {
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Floating View Service")
+            .setContentText("Service is running")
+            .setSmallIcon(R.drawable.ic_tile)
+            .setPriority(NotificationCompat.PRIORITY_LOW);
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return builder.setForegroundServiceBehavior(
+                NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
+            ).build();
+        }
+        return builder.build();
+    }
+
+    private void setupWindowParams() {
+        // Always use TYPE_APPLICATION_OVERLAY for Android 8.0 and above
+        int LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+
+        final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            LAYOUT_FLAG,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        );
+
+        params.gravity = Gravity.TOP | Gravity.START;
+        params.x = 0;
+        params.y = 0;
+
+        //Add the view to the window
+        mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        mWindowManager.addView(mFloatingView, params);
     }
 }

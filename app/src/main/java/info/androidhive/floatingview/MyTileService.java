@@ -1,9 +1,12 @@
 package info.androidhive.floatingview;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 import android.service.quicksettings.Tile;
@@ -22,16 +25,20 @@ public class MyTileService extends TileService {
 
     @Override
     public void onCreate() {
+        super.onCreate();
         createNotificationChannel();
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+        
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Floating View Service")
                 .setContentText("Running...")
-                // Ensure you have a valid icon here
-                //.setSmallIcon(R.drawable.ic_launcher_foreground)
-                .build();
+                .setSmallIcon(R.drawable.ic_tile)  // Make sure you have this icon
+                .setPriority(NotificationCompat.PRIORITY_LOW);
 
-        startForeground(FOREGROUND_SERVICE_ID, notification);
-        super.onCreate();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(FOREGROUND_SERVICE_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        } else {
+            startForeground(FOREGROUND_SERVICE_ID, builder.build());
+        }
     }
 
     @Override
@@ -41,9 +48,12 @@ public class MyTileService extends TileService {
 
     @Override
     public void onTileAdded() {
-        getQsTile().setState(Tile.STATE_INACTIVE);
-        Log.d("test-f","in onClick onTileAdded");
         super.onTileAdded();
+        Tile tile = getQsTile();
+        if (tile != null) {
+            tile.setState(Tile.STATE_INACTIVE);
+            tile.updateTile();
+        }
     }
 
     @Override
@@ -53,14 +63,14 @@ public class MyTileService extends TileService {
 
     @Override
     public void onStartListening() {
-//        Tile tile = getQsTile();
-//        tile.setIcon(Icon.createWithResource(this,R.drawable.ic_title_started));
-//        tile.setLabel(getString(R.string.tile_label));
-//        tile.setContentDescription(getString(R.string.tile_content_description);
-//        tile.setState(Tile.STATE_ACTIVE);
-//        tile.updateTile();
-        Log.d("test-f","in onClick onStartListening");
         super.onStartListening();
+        Tile tile = getQsTile();
+        if (tile != null) {
+            // Check if service is running to set initial state
+            boolean isServiceRunning = isServiceRunning(FloatingViewService.class);
+            tile.setState(isServiceRunning ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
+            tile.updateTile();
+        }
     }
 
     @Override
@@ -71,27 +81,26 @@ public class MyTileService extends TileService {
 
     @Override
     public void onClick() {
-        // Called when the user click the tile
+        super.onClick();
         Tile tile = getQsTile();
-        Log.d("test-f","in onClick TileService"+tile.getState());
+        if (tile != null) {
+            boolean isActive = tile.getState() == Tile.STATE_ACTIVE;
+            // Toggle tile state
+            tile.setState(isActive ? Tile.STATE_INACTIVE : Tile.STATE_ACTIVE);
+            tile.updateTile();
 
-        if(tile.getState() == Tile.STATE_ACTIVE){
-
-            tile.setState(Tile.STATE_INACTIVE);
-            stopService(new Intent(this, FloatingViewService.class));
-
-        }else{
-            tile.setState(Tile.STATE_ACTIVE);
-            Intent serviceIntent = new Intent(this, FloatingViewService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
+            // Toggle floating view
+            Intent intent = new Intent(this, FloatingViewService.class);
+            if (isActive) {
+                stopService(intent);
             } else {
-                startService(serviceIntent);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent);
+                } else {
+                    startService(intent);
+                }
             }
         }
-        tile.updateTile();
-
-        super.onClick();
     }
 
     @Override
@@ -110,5 +119,15 @@ public class MyTileService extends TileService {
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             notificationManager.createNotificationChannel(channel);
         }
+    }
+
+    private boolean isServiceRunning(Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
