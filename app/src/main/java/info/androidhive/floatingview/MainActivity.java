@@ -42,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 // Open quick settings tile settings
-                Intent intent = new Intent("android.settings.ACTION_QUICK_SETTINGS");
+                Intent intent = new Intent("android.settings.QUICK_SETTINGS_TILE_SERVICE_SETTINGS");
                 startActivity(intent);
                 Toast.makeText(MainActivity.this, 
                     "Add the NJ-T tile from Quick Settings", 
@@ -56,8 +56,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == CODE_DRAW_OVER_OTHER_APP_PERMISSION) {
-            if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show();
+            if (Settings.canDrawOverlays(this)) {
+                // Permission granted, initialize the view
+                initializeView();
+            } else {
+                // Permission denied
+                Toast.makeText(this, 
+                    "Draw over other app permission not available. Closing the application",
+                    Toast.LENGTH_SHORT).show();
+                finish();
             }
         }
     }

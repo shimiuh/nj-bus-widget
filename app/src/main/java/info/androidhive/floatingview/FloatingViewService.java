@@ -226,8 +226,14 @@ public class FloatingViewService extends Service {
     }
 
     private void setupWindowParams() {
-        // Always use TYPE_APPLICATION_OVERLAY for Android 8.0 and above
-        int LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        // Use TYPE_APPLICATION_OVERLAY for Android 8.0 and above
+        // Use TYPE_PHONE for older versions
+        int LAYOUT_FLAG;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        } else {
+            LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_PHONE;
+        }
 
         final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
